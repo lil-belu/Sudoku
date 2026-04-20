@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIlN1ZG9rdSBFbGl0ZSAtIE5lb24gRWRpdGlvbiIsICJzaG9ydF9uYW1lIjogIlN1ZG9rdSBFbGl0ZSIsICJkZXNjcmlwdGlvbiI6ICJBIG5lb24tdGhlbWVkIFN1ZG9rdSBnYW1lIHdpdGggQ2xhc3NpYyBhbmQgQ2hhbGxlbmdlIG1vZGVzLiIsICJzdGFydF91cmwiOiAiLiIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDUwNTBhIiwgInRoZW1lX2NvbG9yIjogIiMwMGYzZmYiLCAib3JpZW50YXRpb24iOiAicG9ydHJhaXQiLCAiaWNvbnMiOiBbeyJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sLCUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxOTIgMTkyJyUzRSUzQ3JlY3Qgd2lkdGg9JzE5MicgaGVpZ2h0PScxOTInIGZpbGw9JyUyMzA1MDUwYScvJTNFJTNDdGV4dCB4PSc5NicgeT0nMTMwJyBmb250LXNpemU9JzEyMCcgdGV4dC1hbmNob3I9J21pZGRsZScgZmlsbD0nJTIzMDBmM2ZmJyBmb250LWZhbWlseT0nc2Fucy1zZXJpZicgZm9udC13ZWlnaHQ9J2JvbGQnJTNFUyUzQy90ZXh0JTNFJTNDL3N2ZyUzRSIsICJzaXplcyI6ICIxOTJ4MTkyIiwgInR5cGUiOiAiaW1hZ2Uvc3ZnK3htbCIsICJwdXJwb3NlIjogImFueSBtYXNrYWJsZSJ9XX0=">
     <meta name="theme-color" content="#00f3ff">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -753,8 +753,38 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('[PWA] SW registered:', reg.scope))
+          const swCode = `const CACHE_NAME = 'sudoku-elite-v1';
+
+self.addEventListener('install', e => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.open(CACHE_NAME).then(cache =>
+      cache.match(e.request).then(cached => {
+        const fetched = fetch(e.request).then(res => {
+          cache.put(e.request, res.clone());
+          return res;
+        });
+        return cached || fetched;
+      })
+    )
+  );
+});`;
+          const blob = new Blob([swCode], { type: 'application/javascript' });
+          const swUrl = URL.createObjectURL(blob);
+          navigator.serviceWorker.register(swUrl)
+            .then(reg => console.log('[PWA] SW registered via blob:', reg.scope))
             .catch(err => console.warn('[PWA] SW registration failed:', err));
         });
       }
