@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sudoku Elite - Neon Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap');
+
+        :root {
+            --bg: #05050a;
+            --surface: rgba(16, 20, 35, 0.7);
+            --primary: #00f3ff;
+            --primary-glow: rgba(0, 243, 255, 0.6);
+            --secondary: #bc13fe;
+            --secondary-glow: rgba(188, 19, 254, 0.6);
+            --text: #e0e7ff;
+            --text-dim: #6b779a;
+            --error: #ff1e56;
+            --error-glow: rgba(255, 30, 86, 0.6);
+            --success: #00ff66;
+            --warning: #ffcf00;
+            --warning-glow: rgba(255, 207, 0, 0.6);
+            --board-border: rgba(0, 243, 255, 0.4);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0;
+            font-family: 'Rajdhani', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+        }
+
+
+
+        #app {
+            width: 100%; max-width: 500px; height: 100dvh;
+            display: flex; flex-direction: column; position: relative;
+            backdrop-filter: blur(2px); margin: 0 auto;
+        }
+
+        .screen { display: none; flex-direction: column; height: 100%; width: 100%; padding: 15px; position: absolute; top: 0; left: 0; z-index: 1; }
+        .screen.active { display: flex; z-index: 20; }
+
+        h1 { font-size: 2.5rem; text-align: center; margin-bottom: 1.5rem; color: #fff; text-transform: uppercase; letter-spacing: 4px; text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary-glow), 0 0 40px var(--secondary-glow); }
+        h2 { font-size: 1.6rem; text-align: center; margin-bottom: 1.2rem; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 8px var(--primary-glow); }
+
+        .btn { background: var(--surface); color: var(--primary); border: 1px solid rgba(0, 243, 255, 0.3); padding: 14px 20px; font-size: 1.2rem; font-family: inherit; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.05), 0 4px 10px rgba(0,0,0,0.5); width: 100%; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; }
+        .btn:active { transform: scale(0.96); box-shadow: 0 0 15px var(--primary-glow); }
+        .btn.primary { background: rgba(0, 243, 255, 0.1); border: 1px solid var(--primary); color: #fff; text-shadow: 0 0 5px var(--primary); box-shadow: 0 0 15px var(--primary-glow), inset 0 0 15px var(--primary-glow); }
+
+        .setting-group { margin-bottom: 20px; }
+        .setting-group .btn { margin-bottom: 6px; }
+        .setting-desc { font-size: 0.9rem; color: var(--text-dim); padding: 0 10px; line-height: 1.2; }
+
+        .board-container { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: transform 0.3s ease; width: 100%; max-width: 420px; margin: 0 auto; min-height: 0; position: relative; }
+        .board { display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr); gap: 2px; background: rgba(5, 5, 10, 0.8); padding: 4px; border-radius: 8px; border: 2px solid var(--primary); width: 100%; aspect-ratio: 1; box-shadow: 0 0 20px var(--primary-glow), inset 0 0 15px var(--primary-glow); position: relative; backdrop-filter: blur(5px); }
+
+        .highlighter { position: absolute; background: rgba(188, 19, 254, 0.1); border-radius: 4px; pointer-events: none; transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); transform: scale(1.15); border: 2px solid var(--secondary); box-shadow: 0 0 15px var(--secondary-glow), inset 0 0 10px var(--secondary-glow); z-index: 10; display: none; }
+
+        .cell { background: var(--surface); border-radius: 3px; display: flex; justify-content: center; align-items: center; font-size: clamp(1.2rem, 6vw, 1.8rem); font-weight: 700; cursor: pointer; position: relative; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); color: var(--text); z-index: 3; overflow: hidden; box-sizing: border-box; }
+        .cell.clue { color: var(--text-dim); font-weight: 600; text-shadow: none; }
+        .cell.error { color: var(--error); text-shadow: 0 0 10px var(--error-glow); animation: shake 0.4s; box-shadow: inset 0 0 0 2px var(--error); }
+        .cell.active-card { transform: scale(1.15); background: transparent !important; color: #fff; text-shadow: 0 0 10px var(--secondary), 0 0 20px var(--secondary-glow); z-index: 11; }
+        .cell.match { animation: blinkBorder 1.5s infinite; }
+
+        @keyframes blinkBorder { 0%, 100% { box-shadow: inset 0 0 0 1px transparent; background: var(--surface); } 50% { box-shadow: inset 0 0 8px var(--primary-glow); background: rgba(0, 243, 255, 0.15); text-shadow: 0 0 8px var(--primary-glow); color: #fff;} }
+
+
+        .numpad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px 0; width: 100%; max-width: 420px; margin: 0 auto; }
+        .num-btn { background: rgba(10, 15, 25, 0.8); border: 1px solid rgba(0, 243, 255, 0.2); color: var(--text); padding: 12px 0; font-size: 1.4rem; font-family: inherit; font-weight: 700; border-radius: 8px; cursor: pointer; position: relative; overflow: hidden; display: flex; justify-content: center; align-items: center; transition: all 0.1s; box-shadow: 0 4px 6px rgba(0,0,0,0.4); }
+        .num-btn:active { transform: scale(0.92); background: rgba(0, 243, 255, 0.1); box-shadow: 0 0 10px var(--primary-glow); }
+        .num-btn.active-digit { background: rgba(188, 19, 254, 0.2); border-color: var(--secondary); box-shadow: 0 0 10px var(--secondary-glow); color: #fff; }
+
+        .numpad-row-2 { display: flex; gap: 8px; margin-top: 2px; width: 100%; max-width: 420px; margin: 0 auto; justify-content: space-between; }
+        .btn-action { flex: 1; background: var(--surface); border: 1px solid rgba(0, 243, 255, 0.3); color: var(--primary); padding: 12px 10px; font-size: 1.1rem; font-family: inherit; font-weight: 700; text-transform: uppercase; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.4); position: relative; overflow: hidden; }
+        .btn-action:active { transform: scale(0.95); }
+
+        .ripple { position: absolute; border-radius: 50%; background: rgba(0, 243, 255, 0.4); transform: scale(0); animation: ripple-anim 0.5s linear; pointer-events: none; box-shadow: 0 0 10px var(--primary-glow); }
+        @keyframes ripple-anim { to { transform: scale(2); opacity: 0; } }
+
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 5px 0 10px; font-size: 1.1rem; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 5px var(--primary-glow); width: 100%; max-width: 420px; margin: 0 auto; }
+        .status-badge { background: rgba(16, 20, 35, 0.8); border: 1px solid rgba(0, 243, 255, 0.3); padding: 4px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.5); white-space: nowrap; }
+
+        .notify-bar { width: 100%; max-width: 420px; margin: 0 auto 5px; min-height: 20px; color: var(--warning); font-size: 0.9rem; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 5px var(--warning-glow); opacity: 0; transition: opacity 0.3s; }
+        .notify-bar.show { opacity: 1; }
+
+        /* ------------------- CHALLENGE VISUALS ------------------- */
+
+        /* Dark Room */
+        .darkroom-mode .cell:not(.visible-darkroom) {
+            color: transparent !important;
+            text-shadow: none !important;
+            background: rgba(5, 5, 8, 0.95) !important;
+            border-color: rgba(0, 243, 255, 0.02) !important;
+            box-shadow: none !important;
+        }
+
+        /* Pulse */
+        .pulse-dark .cell.clue { color: transparent !important; text-shadow: none !important; }
+
+        /* Mirror */
+        .mirror-mode { transform: scaleX(-1); }
+        .mirror-mode .cell { transform: scaleX(-1); }
+
+        /* Oxygen */
+        .oxygen-flash { animation: blockFlash 1s infinite; z-index: 5; }
+        @keyframes blockFlash { 
+            0%, 100% { box-shadow: inset 0 0 0 2px var(--error); } 
+            50% { box-shadow: inset 0 0 20px var(--error-glow), inset 0 0 0 2px var(--error); background: rgba(255,30,86,0.2); } 
+        }
+
+        /* Decay */
+        .decay-warning { color: var(--warning) !important; text-shadow: 0 0 5px var(--warning-glow) !important; }
+        .decay-critical { color: var(--error) !important; text-shadow: 0 0 5px var(--error-glow) !important; animation: decayBlink 0.5s infinite; }
+        @keyframes decayBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .decay-locked { color: var(--success) !important; text-shadow: 0 0 5px var(--success) !important; box-shadow: inset 0 -2px 0 var(--success); }
+
+        /* Blind Mode */
+        .blind-mode .cell.clue { color: var(--text) !important; font-weight: 700 !important; }
+
+        /* --------------------------------------------------------- */
+
+        .challenges-grid { display: grid; grid-template-columns: 1fr; gap: 12px; overflow-y: auto; padding-bottom: 20px; }
+        .challenge-card { background: var(--surface); padding: 16px; border-radius: 8px; border: 1px solid rgba(188, 19, 254, 0.3); cursor: pointer; transition: all 0.2s; box-shadow: inset 0 0 10px rgba(188, 19, 254, 0.05); }
+        .challenge-card:active { transform: scale(0.98); box-shadow: 0 0 15px var(--secondary-glow); border-color: var(--secondary); }
+        .challenge-title { font-weight: 700; color: var(--secondary); margin-bottom: 4px; text-shadow: 0 0 5px var(--secondary-glow); text-transform: uppercase; letter-spacing: 1px;}
+        .challenge-desc { font-size: 0.95rem; color: var(--text); }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+        .no-anim * { transition: none !important; animation: none !important; }
+
+        .history-item { background: var(--surface); padding: 12px 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .history-item button { background: rgba(0, 243, 255, 0.1); border: 1px solid var(--primary); padding: 8px 12px; border-radius: 6px; color: var(--primary); cursor: pointer; font-family: inherit; font-weight: 600; text-transform: uppercase; margin-left: 10px; flex-shrink: 0; }
+        .scrollable { overflow-y: auto; flex-grow: 1; padding-right: 5px;}
+        .scrollable::-webkit-scrollbar { width: 4px; }
+        .scrollable::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        .back-btn { background: transparent; border: none; color: var(--secondary); font-size: 1.1rem; font-family: inherit; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; padding: 10px 0; cursor: pointer; text-align: left; margin-bottom: 5px; text-shadow: 0 0 5px var(--secondary-glow); }
+
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        #app { position: relative; z-index: 1; }
+    </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+
+<div id="app">
+    <div id="menu-screen" class="screen active">
+        <h1>Sudoku Elite</h1>
+        <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center;">
+            <button class="btn primary ripple-btn" onclick="nav('difficulty-screen')">Play Classic</button>
+            <button class="btn ripple-btn" onclick="nav('challenges-screen')">Challenge Hub</button>
+            <button class="btn ripple-btn" onclick="nav('leaderboard-screen')">Data Core (History)</button>
+            <button class="btn ripple-btn" onclick="nav('settings-screen')">System Settings</button>
+        </div>
+    </div>
+
+    <div id="difficulty-screen" class="screen">
+        <button class="back-btn" onclick="nav('menu-screen')">← Abort</button>
+        <h2>Select Difficulty</h2>
+        <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center;">
+            <button class="btn ripple-btn" onclick="startGame('easy')">Easy Grid</button>
+            <button class="btn ripple-btn" onclick="startGame('medium')">Medium Grid</button>
+            <button class="btn ripple-btn" onclick="startGame('hard')">Hard Grid</button>
+        </div>
+    </div>
+
+    <div id="challenges-screen" class="screen">
+        <button class="back-btn" onclick="nav('menu-screen')">← Abort</button>
+        <h2>Challenge Hub</h2>
+        <div class="challenges-grid" id="challenges-list"></div>
+    </div>
+
+    <div id="settings-screen" class="screen">
+        <button class="back-btn" onclick="nav('menu-screen')">← Abort</button>
+        <h2>System Settings</h2>
+        <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center;">
+            <div class="setting-group">
+                <button class="btn ripple-btn" onclick="toggleSetting('haptics')">
+                    Haptic Feedback <span id="set-haptics" style="color: var(--success); text-shadow: 0 0 5px var(--success);">ON</span>
+                </button>
+                <div class="setting-desc">Enables physical device vibration on interactions.</div>
+            </div>
+            <div class="setting-group">
+                <button class="btn ripple-btn" onclick="toggleSetting('animations')">
+                    Kinetic Motion <span id="set-animations" style="color: var(--success); text-shadow: 0 0 5px var(--success);">ON</span>
+                </button>
+                <div class="setting-desc">Toggles UI transitions, floating elevations, and pulsing visual effects.</div>
+            </div>
+            <div class="setting-group">
+                <button class="btn ripple-btn" onclick="toggleSetting('music')">
+                    Ambient Synth <span id="set-music" style="color: var(--error); text-shadow: 0 0 5px var(--error);">OFF</span>
+                </button>
+                <div class="setting-desc">Activates continuous background drone.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="leaderboard-screen" class="screen">
+        <button class="back-btn" onclick="nav('menu-screen')">← Abort</button>
+        <h2>Data Core</h2>
+        <div class="scrollable" id="history-list"></div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div class="top-bar">
+            <span id="game-mode-label" style="flex:1; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Classic</span>
+            <div class="status-badge" id="timer-badge">⏱ <span id="game-timer" style="color: #fff; text-shadow: 0 0 8px rgba(255,255,255,0.8); min-width:40px; text-align:right;">00:00</span></div>
+            <div class="status-badge" id="mistakes-badge" style="margin-left: 6px; display: none; border-color: rgba(255, 30, 86, 0.4);">⚠ <span id="game-mistakes" style="color: var(--error); text-shadow: 0 0 5px var(--error-glow);">0/3</span></div>
+            <button style="background:transparent;border:none;color:var(--error);font-size:1.6rem;text-shadow: 0 0 8px var(--error-glow); cursor:pointer; margin-left: 6px; padding: 0 5px;" onclick="abandonGame()">✕</button>
+        </div>
+        <div class="notify-bar" id="notify-bar"></div>
+
+        <div class="board-container" id="board-container">
+            <div class="board" id="board"></div>
+            <!-- Highlighter dynamically added here -->
+        </div>
+
+        <div class="numpad" id="numpad">
+            <button class="num-btn ripple-btn" data-num="1" onclick="handleNumpad(1)">1</button>
+            <button class="num-btn ripple-btn" data-num="2" onclick="handleNumpad(2)">2</button>
+            <button class="num-btn ripple-btn" data-num="3" onclick="handleNumpad(3)">3</button>
+            <button class="num-btn ripple-btn" data-num="4" onclick="handleNumpad(4)">4</button>
+            <button class="num-btn ripple-btn" data-num="5" onclick="handleNumpad(5)">5</button>
+            <button class="num-btn ripple-btn" data-num="6" onclick="handleNumpad(6)">6</button>
+            <button class="num-btn ripple-btn" data-num="7" onclick="handleNumpad(7)">7</button>
+            <button class="num-btn ripple-btn" data-num="8" onclick="handleNumpad(8)">8</button>
+            <button class="num-btn ripple-btn" data-num="9" onclick="handleNumpad(9)">9</button>
+            <button class="num-btn ripple-btn" style="color: var(--error); border-color: rgba(255, 30, 86, 0.4);" onclick="handleNumpad(0)">✗</button>
+        </div>
+        <div class="numpad-row-2">
+            <button class="btn-action ripple-btn" id="btn-submit" onclick="submitBlind()" style="display:none; color:var(--success); border-color:var(--success);">SUBMIT</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const settings = { haptics: true, animations: true, music: false };
+    let history = JSON.parse(localStorage.getItem('sudoku_history_v4') || '[]');
+    let gameState = null;
+    let audioCtx, oscillator;
+
+    class Sudoku {
+        constructor() { this.board = Array(81).fill(0); }
+        isValid(board, row, col, num) {
+            for(let i=0; i<9; i++) { if(board[row*9+i] === num) return false; if(board[i*9+col] === num) return false; }
+            let sr = Math.floor(row/3)*3, sc = Math.floor(col/3)*3;
+            for(let i=0; i<3; i++) for(let j=0; j<3; j++) if(board[(sr+i)*9 + sc+j] === num) return false;
+            return true;
+        }
+        fillBoard(board) {
+            for(let i=0; i<81; i++) {
+                if(board[i] === 0) {
+                    let nums = [1,2,3,4,5,6,7,8,9].sort(() => Math.random() - 0.5);
+                    for(let num of nums) {
+                        if(this.isValid(board, Math.floor(i/9), i%9, num)) {
+                            board[i] = num;
+                            if(this.fillBoard(board)) return true;
+                            board[i] = 0;
+                        }
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
+        generate(emptySpaces) {
+            this.board = Array(81).fill(0);
+            this.fillBoard(this.board);
+            let solution = [...this.board], puzzle = [...this.board];
+            let attempts = emptySpaces;
+            while(attempts > 0) { let idx = Math.floor(Math.random() * 81); if(puzzle[idx] !== 0) { puzzle[idx] = 0; attempts--; } }
+            return { puzzle, solution };
+        }
+    }
+
+    const CHALLENGES = [
+        { id: 'parallax', name: 'The Parallax', desc: 'Values shift +1 every 60s.', rules: { parallax: true } },
+        { id: 'blind', name: 'Blind Man\'s Bluff', desc: 'Zero UI feedback. Fill all and submit.', rules: { blind: true } },
+        { id: 'sequence', name: 'The Sequence Lock', desc: 'Strict order. Place all 1s, then 2s...', rules: { ascension: true } },
+        { id: 'darkroom', name: 'Dark Room', desc: 'Only selected cell and immediate 8 neighbors are visible.', rules: { darkroom: true } },
+        { id: 'pulse', name: 'The Pulse', desc: '10s clues visible & locked, 20s clues hidden & unlocked.', rules: { pulse: true } },
+        { id: 'singularity', name: 'The Singularity', desc: 'Notes only show for active digit.', rules: { singularity: true } },
+        { id: 'oxygen', name: 'The Oxygen Tank', desc: '3m limit. Fix flashing 3x3 blocks in 10s or lose 30s.', rules: { oxygen: true, timeLimit: 180 } },
+        { id: 'mirror', name: 'The Mirror Realm', desc: 'Visual and touch controls are horizontally mirrored.', rules: { mirror: true } },
+        { id: 'decay', name: 'The Decay', desc: 'Placed digits vanish in 60s unless sector is complete.', rules: { decay: true } },
+        { id: 'glitch', name: 'The Glitch', desc: 'Every 45s, two placed digits swap positions.', rules: { glitch: true } }
+    ];
+
+    function nav(screenId) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(screenId).classList.add('active'); vibrate(30); }
+    function toggleSetting(key) {
+        settings[key] = !settings[key];
+        const el = document.getElementById(`set-${key}`);
+        el.innerText = settings[key] ? 'ON' : 'OFF';
+        el.style.color = settings[key] ? 'var(--success)' : 'var(--error)';
+        el.style.textShadow = `0 0 5px ${settings[key] ? 'var(--success)' : 'var(--error)'}`;
+        if(key === 'animations') document.body.classList.toggle('no-anim', !settings.animations);
+        if(key === 'music') playMusic(settings.music);
+        vibrate(30);
+    }
+    function vibrate(ms) { if(settings.haptics && window.navigator && window.navigator.vibrate) try{ window.navigator.vibrate(ms); }catch(e){} }
+    function playMusic(state) {
+        if(state) {
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            oscillator = audioCtx.createOscillator(); oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(110, audioCtx.currentTime);
+            const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+            const filter = audioCtx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+            oscillator.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination); oscillator.start();
+        } else if(oscillator) { oscillator.stop(); }
+    }
+    document.addEventListener('mousedown', createRipple); document.addEventListener('touchstart', (e) => createRipple(e.touches[0]));
+    function createRipple(e) {
+        const target = e.target.closest('.ripple-btn'); if(!target) return;
+        const circle = document.createElement('span'); const d = Math.max(target.clientWidth, target.clientHeight); const rect = target.getBoundingClientRect();
+        circle.style.width = circle.style.height = `${d}px`; circle.style.left = `${e.clientX - rect.left - d/2}px`; circle.style.top = `${e.clientY - rect.top - d/2}px`;
+        circle.classList.add('ripple'); target.appendChild(circle); setTimeout(() => circle.remove(), 600);
+    }
+
+    function showNotify(msg, color='var(--warning)') {
+        const bar = document.getElementById('notify-bar');
+        bar.innerText = msg; bar.style.color = color; bar.style.textShadow = `0 0 5px ${color}`;
+        bar.classList.add('show'); setTimeout(() => bar.classList.remove('show'), 3000);
+    }
+
+
+    function startGame(difficulty, seedState = null, challengeId = null) {
+        const gen = new Sudoku();
+        let empties = difficulty === 'easy' ? 35 : difficulty === 'medium' ? 45 : 55;
+        const challenge = CHALLENGES.find(c => c.id === challengeId) || null;
+        let rules = challenge ? { ...challenge.rules } : {};
+        if (!challengeId) rules.maxMistakes = difficulty === 'easy' ? 3 : (difficulty === 'medium' ? 2 : 1);
+        let boardData = seedState ? seedState : gen.generate(empties);
+
+        gameState = {
+            id: Date.now(), difficulty, challengeId, rules,
+            puzzle: [...boardData.puzzle], solution: [...boardData.solution], current: [...boardData.puzzle],
+            selected: null, timer: rules.timeLimit || 0, timeElapsed: 0, mistakes: 0,
+            interval: null, activeDigit: rules.ascension ? 1 : null, 
+            // Challenge specific states
+            currentAscensionNum: 1, pulsePhase: 'light',
+            flashBlock: null, flashTimer: 0,
+            placedTimestamps: Array(81).fill(0), lockedCells: Array(81).fill(false),
+            glitchTimer: 45
+        };
+
+        const boardEl = document.getElementById('board');
+        boardEl.className = 'board';
+        if(rules.mirror) boardEl.classList.add('mirror-mode');
+        if(rules.blind) boardEl.classList.add('blind-mode');
+
+        document.getElementById('btn-submit').style.display = rules.blind ? 'block' : 'none';
+
+        renderBoard(); nav('game-screen');
+
+        let modeLabel = challenge ? challenge.name : `Classic - ${difficulty}`;
+        if (rules.ascension) modeLabel += ` (Target: 1)`;
+        document.getElementById('game-mode-label').innerText = modeLabel;
+
+        const mistakesBadge = document.getElementById('mistakes-badge');
+        if(rules.maxMistakes) { mistakesBadge.style.display = 'flex'; document.getElementById('game-mistakes').innerText = `0/${rules.maxMistakes}`; }
+        else mistakesBadge.style.display = 'none';
+
+        document.getElementById('game-timer').innerText = rules.timeLimit ? formatTime(rules.timeLimit) : "00:00";
+        clearInterval(gameState.interval); gameState.interval = setInterval(gameTick, 1000);
+    }
+
+    function renderBoard() {
+        const boardContainer = document.getElementById('board-container');
+        let highlighter = document.getElementById('highlighter');
+        if (!highlighter) {
+            highlighter = document.createElement('div');
+            highlighter.id = 'highlighter';
+            highlighter.className = 'highlighter';
+            boardContainer.appendChild(highlighter);
+        }
+
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = '';
+
+        // Update Numpad UI for active digit
+        document.querySelectorAll('.num-btn').forEach(btn => {
+            btn.classList.remove('active-digit');
+            if (parseInt(btn.dataset.num) === gameState.activeDigit) btn.classList.add('active-digit');
+        });
+
+        for(let i=0; i<81; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell ripple-btn';
+                const _canHighlight = !gameState.rules.blind && !gameState.challengeId && (gameState.difficulty === 'easy' || gameState.difficulty === 'medium');
+                if (_canHighlight && gameState.selected !== null) {
+                    const selNum = gameState.current[gameState.selected];
+                    if (selNum !== 0 && gameState.current[i] === selNum && i !== gameState.selected) cell.classList.add('match');
+                }
+
+            const col = i % 9, row = Math.floor(i / 9);
+            if (col === 2 || col === 5) cell.style.borderRight = '2px solid var(--board-border)';
+            if (row === 2 || row === 5) cell.style.borderBottom = '2px solid var(--board-border)';
+
+            if (gameState.rules.oxygen && gameState.flashBlock !== null) {
+                if (Math.floor(row/3)*3 + Math.floor(col/3) === gameState.flashBlock) cell.classList.add('oxygen-flash');
+            }
+            if (gameState.rules.decay && gameState.current[i] !== 0 && gameState.puzzle[i] === 0) {
+                if (gameState.lockedCells[i]) {
+                    cell.classList.add('decay-locked');
+                } else {
+                    let age = gameState.timeElapsed - gameState.placedTimestamps[i];
+                    if (age > 45) cell.classList.add('decay-critical');
+                    else if (age > 30) cell.classList.add('decay-warning');
+                }
+            }
+
+            if(gameState.puzzle[i] !== 0) {
+                cell.classList.add('clue'); cell.innerText = gameState.current[i];
+            } else if(gameState.current[i] !== 0) {
+                cell.innerText = gameState.current[i];
+            }
+            cell.dataset.index = i;
+            cell.onclick = () => selectCell(i);
+            boardEl.appendChild(cell);
+        }
+
+        if (gameState.rules.darkroom) updateDarkRoom();
+        if (gameState.rules.pulse) document.getElementById('board').classList.toggle('pulse-dark', gameState.pulsePhase === 'dark');
+
+        // Handle highlighter bounds matching after cells are rendered
+        if (gameState.selected !== null) {
+            const cells = document.querySelectorAll('.cell');
+            const target = cells[gameState.selected];
+            if(target) {
+                target.classList.add('active-card');
+                highlighter.style.display = 'block';
+                // Calculate position relative to the board
+                highlighter.style.left = (boardEl.offsetLeft + target.offsetLeft) + 'px';
+                highlighter.style.top = (boardEl.offsetTop + target.offsetTop) + 'px';
+                highlighter.style.width = target.offsetWidth + 'px';
+                highlighter.style.height = target.offsetHeight + 'px';
+            }
+        } else {
+            highlighter.style.display = 'none';
+        }
+    }
+
+    function updateDarkRoom() {
+        const cells = document.querySelectorAll('.cell');
+        document.getElementById('board').classList.add('darkroom-mode');
+        cells.forEach(c => c.classList.remove('visible-darkroom'));
+        if (gameState.selected !== null) {
+            let sr = Math.floor(gameState.selected / 9), sc = gameState.selected % 9;
+            for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) {
+                if(sr+dr>=0 && sr+dr<9 && sc+dc>=0 && sc+dc<9) cells[(sr+dr)*9+(sc+dc)].classList.add('visible-darkroom');
+            }
+        }
+    }
+
+    function selectCell(index) {
+        if(gameState.rules.mirror) {
+            let r = Math.floor(index/9), c = index%9;
+            index = r*9 + (8-c);
+        }
+        const cells = document.querySelectorAll('.cell');
+        if (gameState.selected === index) {
+            cells[index] && cells[index].classList.remove('active-card');
+            gameState.selected = null;
+            if (typeof setBgDigit === 'function') setBgDigit(null);
+            renderBoard();
+            return;
+        }
+        if(gameState.selected !== null && cells[gameState.selected]) cells[gameState.selected].classList.remove('active-card');
+        gameState.selected = index;
+        vibrate(20);
+        const _sNum = gameState.current[index];
+        if (typeof setBgDigit === 'function') setBgDigit(_sNum !== 0 ? _sNum : null);
+        renderBoard();
+    }
+
+    function handleNumpad(num) {
+        if (gameState.rules.pulse && gameState.pulsePhase === 'light') { showNotify("KEYPAD LOCKED (LIGHT PHASE)", "var(--error)"); vibrate([50,50]); return; }
+
+        if (gameState.rules.ascension && num !== 0 && num !== gameState.currentAscensionNum) { 
+            if (gameState.selected !== null) showError(gameState.selected);
+            return;
+        }
+
+        if (num !== 0) gameState.activeDigit = num;
+        if (typeof setBgDigit === 'function') setBgDigit(num === 0 ? null : num);
+
+        if (gameState.selected === null) { renderBoard(); return; } // Just set active digit
+
+        const idx = gameState.selected;
+        if(gameState.puzzle[idx] !== 0) { if (num !== 0) showError(idx); return; }
+
+
+        gameState.current[idx] = num;
+        if (gameState.rules.decay && num !== 0) { gameState.placedTimestamps[idx] = gameState.timeElapsed; gameState.lockedCells[idx] = false; }
+
+        let isCorrect = (num === gameState.solution[idx]);
+
+        if (gameState.rules.oxygen && num !== 0 && isCorrect && gameState.flashBlock !== null) {
+            let r = Math.floor(idx/9), c = idx%9;
+            if (Math.floor(r/3)*3 + Math.floor(c/3) === gameState.flashBlock) {
+                gameState.flashBlock = null; showNotify("SECTOR SECURED", "var(--success)");
+            }
+        }
+
+        if(num !== 0 && !isCorrect && !gameState.rules.blind) {
+            showError(idx);
+            if(gameState.rules.maxMistakes) {
+                gameState.mistakes++; document.getElementById('game-mistakes').innerText = `${gameState.mistakes}/${gameState.rules.maxMistakes}`;
+                if(gameState.mistakes >= gameState.rules.maxMistakes) { setTimeout(() => gameOver(false), 300); return; }
+            }
+        } else if (num !== 0) { vibrate(15); }
+
+        if(gameState.rules.ascension && num !== 0) {
+            const count = gameState.current.filter(n => n === gameState.currentAscensionNum).length;
+            if(count === 9 && gameState.currentAscensionNum < 9) {
+                gameState.currentAscensionNum++; gameState.activeDigit = gameState.currentAscensionNum;
+                showNotify(`SEQUENCE ADVANCED: TARGET ${gameState.currentAscensionNum}`, "var(--success)");
+                document.getElementById('game-mode-label').innerText = `The Sequence Lock (Target: ${gameState.currentAscensionNum})`;
+            }
+        }
+
+        if(!gameState.rules.blind) checkWin();
+        renderBoard();
+    }
+
+    function showError(idx) {
+        const cell = document.querySelectorAll('.cell')[idx];
+        if(cell && !gameState.rules.blind) { cell.classList.add('error'); vibrate([50, 50, 50]); setTimeout(() => cell.classList.remove('error'), 400); }
+    }
+
+    function checkWin() {
+        if(gameState.current.every((val, i) => val === gameState.solution[i])) gameOver(true);
+    }
+
+    function submitBlind() {
+        if(gameState.current.includes(0)) { showNotify("INCOMPLETE GRID - FILL ALL CELLS"); vibrate([50,50]); return; }
+        if(gameState.current.every((val, i) => val === gameState.solution[i])) gameOver(true); else gameOver(false);
+    }
+
+    function checkLocked(idx) {
+        let r = Math.floor(idx/9), c = idx%9;
+        let rowL = true, colL = true, blkL = true;
+        for(let i=0; i<9; i++) { if(gameState.current[r*9+i] !== gameState.solution[r*9+i]) rowL = false; if(gameState.current[i*9+c] !== gameState.solution[i*9+c]) colL = false; }
+        let br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+        for(let i=0; i<3; i++) for(let j=0; j<3; j++) if(gameState.current[(br+i)*9+(bc+j)] !== gameState.solution[(br+i)*9+(bc+j)]) blkL = false;
+        return rowL || colL || blkL;
+    }
+
+    function gameTick() {
+        gameState.timeElapsed++;
+        let needsRender = false;
+
+        if (gameState.rules.parallax && gameState.timeElapsed > 0 && gameState.timeElapsed % 60 === 0) {
+            for(let i=0; i<81; i++) {
+                if(gameState.puzzle[i]>0) gameState.puzzle[i] = (gameState.puzzle[i]%9)+1;
+                if(gameState.current[i]>0) gameState.current[i] = (gameState.current[i]%9)+1;
+                gameState.solution[i] = (gameState.solution[i]%9)+1;
+            }
+            showNotify("PARALLAX SHIFT: +1", "var(--secondary)"); vibrate([30, 100, 30]); needsRender = true;
+        }
+
+        if (gameState.rules.pulse) {
+            let t = gameState.timeElapsed % 30;
+            let newPhase = t < 10 ? 'light' : 'dark';
+            if (newPhase !== gameState.pulsePhase) { gameState.pulsePhase = newPhase; vibrate(30); needsRender = true; }
+        }
+
+        if (gameState.rules.oxygen) {
+            if (gameState.timeElapsed > 0 && gameState.timeElapsed % 30 === 0) {
+                gameState.flashBlock = Math.floor(Math.random() * 9); gameState.flashTimer = 10; vibrate([40,40,40]); 
+                showNotify("CRITICAL: OXYGEN LEAK IN SECTOR " + (gameState.flashBlock + 1), "var(--error)"); needsRender = true;
+            }
+            if (gameState.flashBlock !== null) {
+                gameState.flashTimer--;
+                if (gameState.flashTimer <= 0) {
+                    gameState.timer -= 30; gameState.flashBlock = null; showNotify("OXYGEN DEPLETED: -30 SECONDS", "var(--error)"); vibrate([100,100,100]); needsRender = true;
+                }
+            }
+        }
+
+        if (gameState.rules.glitch) {
+            gameState.glitchTimer--;
+            if (gameState.glitchTimer <= 0) {
+                let p = []; for(let i=0; i<81; i++) if(gameState.puzzle[i]===0 && gameState.current[i]!==0) p.push(i);
+                if (p.length >= 2) {
+                    let a = p[Math.floor(Math.random()*p.length)], b = p[Math.floor(Math.random()*p.length)];
+                    while(a === b) b = p[Math.floor(Math.random()*p.length)];
+                    let temp = gameState.current[a]; gameState.current[a] = gameState.current[b]; gameState.current[b] = temp;
+                    showNotify("GLITCH DETECTED: DATA SWAPPED", "var(--error)"); vibrate([50, 50, 50]); needsRender = true;
+                }
+                gameState.glitchTimer = 45;
+            }
+        }
+
+        if (gameState.rules.decay) {
+            for(let i=0; i<81; i++) {
+                if (gameState.current[i] !== 0 && gameState.puzzle[i] === 0 && !gameState.lockedCells[i]) {
+                    let age = gameState.timeElapsed - gameState.placedTimestamps[i];
+                    if (age >= 60) {
+                        if (checkLocked(i)) { gameState.lockedCells[i] = true; needsRender = true; }
+                        else { gameState.current[i] = 0; needsRender = true; vibrate(15); }
+                    } else if (age === 31 || age === 46) {
+                        needsRender = true; // Trigger color updates for warning/critical
+                    }
+                }
+            }
+        }
+
+        if(gameState.rules.timeLimit) {
+            gameState.timer--; document.getElementById('game-timer').innerText = formatTime(Math.max(0, gameState.timer));
+            if(gameState.timer <= 0) gameOver(false);
+        } else {
+            document.getElementById('game-timer').innerText = formatTime(gameState.timeElapsed);
+        }
+
+        if(needsRender) renderBoard();
+    }
+
+    function formatTime(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+
+    function gameOver(win, abandoned = false) {
+        clearInterval(gameState.interval);
+        let statusStr = win ? 'Completed' : (abandoned ? 'Abandoned' : 'Failed');
+        let puzzleId = gameState.puzzle.join(''); 
+        setTimeout(() => {
+            if (!abandoned) alert(win ? "MISSION ACCOMPLISHED!" : "SYSTEM FAILURE: GAME OVER!");
+            let existingIndex = history.findIndex(h => h.puzzleId === puzzleId);
+            if (existingIndex !== -1) {
+                let existing = history[existingIndex]; existing.attempts += 1;
+                if (win) existing.cleared += 1; else if (abandoned) existing.abandoned += 1; else existing.failed += 1;
+                existing.lastStatus = statusStr; existing.lastDate = new Date().toLocaleString();
+                history.splice(existingIndex, 1); history.unshift(existing);
+            } else {
+                let modeName = gameState.challengeId ? CHALLENGES.find(c=>c.id===gameState.challengeId).name : gameState.difficulty;
+                history.unshift({
+                    puzzleId: puzzleId, mode: modeName, seed: { puzzle: gameState.puzzle, solution: gameState.solution },
+                    attempts: 1, cleared: win ? 1 : 0, failed: (!win && !abandoned) ? 1 : 0, abandoned: abandoned ? 1 : 0,
+                    lastStatus: statusStr, lastDate: new Date().toLocaleString()
+                });
+            }
+            if(history.length > 25) history.pop();
+            localStorage.setItem('sudoku_history_v4', JSON.stringify(history));
+            renderHistory(); nav('menu-screen');
+        }, 100);
+    }
+
+    function abandonGame() { if(confirm("Abort current session?")) gameOver(false, true); }
+
+    function renderHistory() {
+        const list = document.getElementById('history-list'); list.innerHTML = '';
+        history.forEach(item => {
+            const div = document.createElement('div'); div.className = 'history-item';
+            let statusColor = 'var(--error)';
+            if (item.lastStatus === 'Completed') statusColor = 'var(--success)';
+            if (item.lastStatus === 'Abandoned') statusColor = 'var(--warning)';
+            div.style.borderLeftColor = statusColor;
+            div.innerHTML = `
+                <div style="flex:1;">
+                    <strong style="color:var(--primary); text-transform:uppercase; letter-spacing:1px; font-size:1.1rem;">${item.mode}</strong><br>
+                    <span style="color:${statusColor}; font-weight:700; font-size: 1.1rem; text-shadow:0 0 5px ${statusColor}; text-transform:uppercase;">${item.lastStatus}</span><br>
+                    <div style="color:var(--text-dim); font-size:0.9rem; margin-top:4px;">Attempts: <span style="color:var(--text)">${item.attempts}</span> | Clear: <span style="color:var(--success)">${item.cleared}</span> | Fail: <span style="color:var(--error)">${item.failed}</span> | Abort: <span style="color:var(--warning)">${item.abandoned}</span></div>
+                    <small style="color:var(--text-dim); opacity:0.6; font-size:0.75rem;">${item.lastDate}</small>
+                </div>`;
+            const btn = document.createElement('button'); btn.innerText = 'RETRY'; btn.className = 'ripple-btn';
+            btn.onclick = () => startGame(item.mode.toLowerCase(), item.seed);
+            div.appendChild(btn); list.appendChild(div);
+        });
+    }
+
+    function init() {
+        const cList = document.getElementById('challenges-list');
+        CHALLENGES.forEach(c => {
+            const div = document.createElement('div'); div.className = 'challenge-card ripple-btn';
+            div.innerHTML = `<div class="challenge-title">${c.name}</div><div class="challenge-desc">${c.desc}</div>`;
+            div.onclick = () => startGame('hard', null, c.id); cList.appendChild(div);
+        });
+        renderHistory();
+    }
+    init();
+
+    (function () {
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        const COLORS = [[0,243,255],[188,19,254],[0,255,102],[255,207,0]];
+        const COUNT = 15;
+        let W, H, particles = [];
+        let pinnedDigit = null;
+        function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+        function randCol(){ return [...COLORS[Math.floor(Math.random()*COLORS.length)]]; }
+        function make(startY){
+            const size=Math.random()*90+40;
+            return { x:Math.random()*W, y:startY!==undefined?startY:Math.random()*H, size,
+                num:Math.floor(Math.random()*9)+1, fromNum:null, toNum:null, digitT:1,
+                speed:Math.random()*0.5+0.2, col:randCol(), targetCol:randCol(),
+                alpha:Math.random()*0.22+0.1, targetAlpha:Math.random()*0.22+0.1,
+                colSpeed:Math.random()*0.01+0.004,
+                blinkTimer:Math.random()*300, blinkInterval:Math.random()*200+150, dir:-1 };
+        }
+        function init(){ resize(); particles=[]; for(let i=0;i<COUNT;i++) particles.push(make()); }
+        function lerp(a,b,t){return a+(b-a)*t;}
+        function lerpCol(a,b,t){return[Math.round(lerp(a[0],b[0],t)),Math.round(lerp(a[1],b[1],t)),Math.round(lerp(a[2],b[2],t))];}
+        window.setBgDigit=function(n){
+            const prev=pinnedDigit; pinnedDigit=n;
+            particles.forEach(p=>{
+                p.dir=(n!==null)?1:-1;
+                if(n!==null&&n!==prev){p.fromNum=p.num;p.toNum=n;p.digitT=0;}
+                else if(n===null&&prev!==null){p.fromNum=p.num;p.toNum=Math.floor(Math.random()*9)+1;p.num=p.toNum;p.digitT=0;}
+            });
+        };
+        function draw(){
+            ctx.clearRect(0,0,W,H);
+            particles.forEach(p=>{
+                p.y+=p.speed*p.dir;
+                if(p.dir===-1&&p.y<-p.size*1.5){const np=make(H+p.size);np.dir=-1;np.num=pinnedDigit===null?Math.floor(Math.random()*9)+1:pinnedDigit;if(pinnedDigit!==null)np.dir=1;Object.assign(p,np);}
+                else if(p.dir===1&&p.y>H+p.size*1.5){const np=make(-p.size);np.dir=1;np.num=pinnedDigit!==null?pinnedDigit:Math.floor(Math.random()*9)+1;Object.assign(p,np);}
+                p.blinkTimer++;
+                if(p.blinkTimer>p.blinkInterval){p.targetCol=randCol();p.targetAlpha=Math.random()*0.22+0.1;p.blinkTimer=0;p.blinkInterval=Math.random()*200+150;}
+                p.col=lerpCol(p.col,p.targetCol,p.colSpeed);
+                p.alpha=lerp(p.alpha,p.targetAlpha,0.012);
+                let displayNum=p.num,scale=1;
+                if(p.digitT<1){p.digitT=Math.min(1,p.digitT+0.07);
+                    if(p.digitT<0.5){scale=1-p.digitT*2;displayNum=p.fromNum;}
+                    else{scale=(p.digitT-0.5)*2;displayNum=p.toNum;if(p.digitT>=1)p.num=p.toNum;}}
+                const[r,g,b]=p.col;
+                ctx.save();ctx.translate(p.x,p.y);ctx.scale(scale,scale);
+                ctx.globalAlpha=p.alpha*Math.max(0.01,scale);
+                ctx.font=`900 ${p.size}px 'Rajdhani',sans-serif`;
+                ctx.fillStyle=`rgb(${r},${g},${b})`;
+                ctx.textAlign='center';ctx.textBaseline='middle';
+                ctx.fillText(displayNum,0,0);ctx.restore();
+            });
+            requestAnimationFrame(draw);
+        }
+        window.addEventListener('resize',resize);
+        init();draw();
+    })();
+
+    </script>
+</body>
+</html>
